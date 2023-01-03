@@ -15,6 +15,7 @@ class QMKJSONEncoder(json.JSONEncoder):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.indentation_level = 0
+        self.layout_like_object = False
 
         if not self.indent:
             self.indent = 4
@@ -75,9 +76,12 @@ class InfoJSONEncoder(QMKJSONEncoder):
         """Encode info.json dictionaries.
         """
         if obj:
-            if set(("x", "y")).issubset(obj.keys()):
+            if set(("x", "y")).issubset(obj.keys()) or (len(obj.keys()) == 1 and "matrix" in obj.keys()):
                 # These are part of a layout/led_config, put them on a single line.
-                return "{ " + ", ".join(f"{self.encode(key)}: {self.encode(element)}" for key, element in sorted(obj.items())) + " }"
+                self.layout_like_object = True
+                output = "{ " + ", ".join(f"{self.encode(key)}: {self.encode(element)}" for key, element in sorted(obj.items(), key=self.sort_dict)) + " }"
+                self.layout_like_object = False
+                return output
 
             else:
                 self.indentation_level += 1
@@ -92,6 +96,7 @@ class InfoJSONEncoder(QMKJSONEncoder):
         """
         key = key[0]
 
+        # Overall sorting of keys
         if self.indentation_level == 1:
             if key == 'manufacturer':
                 return '10keyboard_name'
@@ -103,13 +108,39 @@ class InfoJSONEncoder(QMKJSONEncoder):
                 return '12maintainer'
 
             elif key == 'community_layouts':
-                return '97community_layouts'
+                return '96community_layouts'
 
             elif key == 'layout_aliases':
-                return '98layout_aliases'
+                return '97layout_aliases'
+
+            elif key == 'base_layout':
+                return '98base_layout'
 
             elif key == 'layouts':
                 return '99layouts'
+
+            else:
+                return '50' + str(key)
+
+        # Sorting within layout-like objects
+        if self.layout_like_object:
+            if key == "matrix":
+                return "10matrix"
+
+            elif key == "x":
+                return "11x"
+
+            elif key == "y":
+                return "11y"
+
+            elif key == "w":
+                return "12w"
+
+            elif key == "h":
+                return "13h"
+
+            elif key == "r":
+                return "14r"
 
             else:
                 return '50' + str(key)
